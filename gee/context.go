@@ -18,6 +18,12 @@ type Context struct {
 	Params map[string]string
 	// response info
 	StatusCode int
+
+	// middleware functions saved
+	// func* like this { part1 c.Next() part2 }
+	// executed flow: funcA -> funcB -> Handler -> funcB -> funcA
+	handlers []HandlerFunc
+	index    int
 }
 
 func newContext(w http.ResponseWriter, req *http.Request) *Context {
@@ -26,6 +32,15 @@ func newContext(w http.ResponseWriter, req *http.Request) *Context {
 		Req:    req,
 		Path:   req.URL.Path,
 		Method: req.Method,
+		index:  -1,
+	}
+}
+
+func (c *Context) Next() {
+	c.index++
+	s := len(c.handlers)
+	for ; c.index < s; c.index++ {
+		c.handlers[c.index](c)
 	}
 }
 
@@ -71,6 +86,12 @@ func (c *Context) Data(code int, data []byte) {
 }
 
 func (c *Context) HTML(code int, html string) {
+	c.SetHeader("Content-Type", "text/html")
+	c.Status(code)
+	c.Writer.Write([]byte(html))
+}
+
+func (c *Context) Fail(code int, html string) {
 	c.SetHeader("Content-Type", "text/html")
 	c.Status(code)
 	c.Writer.Write([]byte(html))
